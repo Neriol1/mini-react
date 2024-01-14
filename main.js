@@ -1,7 +1,6 @@
-import React from './core/React';
 import ReactDOM from './core/ReactDom';
+import { App } from './App';
 
-const root = document.querySelector('#root');
-const app = React.createElement('div',{id:'app'},'hello mini-react');
-ReactDOM.createRoot(root).render(app);
+
+ReactDOM.createRoot(document.querySelector('#root')).render(App);
 
