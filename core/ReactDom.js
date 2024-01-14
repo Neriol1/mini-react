@@ -1,13 +1,13 @@
-import React from "./React";
+import React from './React'
 const ReactDOM = {
-  createRoot(container){
+  createRoot(container) {
     return {
-      render(vdom){
-        container.innerHTML = '';
-        React.render(vdom,container);
-      }
+      render(vdom) {
+        container.innerHTML = ''
+        React.render(vdom, container)
+      },
     }
-  } 
+  },
 }
 
-export default ReactDOM;
+export default ReactDOM
