@@ -18,58 +18,59 @@ const createTextNode = textValue => {
     },
   }
 }
-
 const render = (vdom, container) => {
-  // const dom = vdom.type === TEXT_ELEMENT ? document.createTextNode('') : document.createElement(vdom.type)
-  // Object.keys(vdom.props).forEach(key => {
-  //   if (key !== 'children') {
-  //     dom[key] = vdom.props[key]
-  //   }
-  // })
-  // vdom.props.children.forEach(child => {
-  //   render(child, dom)
-  // })
-  // container.appendChild(dom)
-  nextUnitOfWork = {
-    dom: container,
-    props: {
-      children: [vdom],
-    },
+  nextUnitOfWork = new Fiber(null, { children: [vdom] }, null, container)
+}
+const creatDom = type => {
+  return type === TEXT_ELEMENT ? document.createTextNode('') : document.createElement(type)
+}
+const handleProps = (dom, props) => {
+  Object.keys(props).forEach(key => {
+    if (key !== 'children') {
+      dom[key] = props[key]
+    }
+  })
+}
+
+class Fiber {
+  constructor(type, props, parent, dom = null, child = null, sibling = null) {
+    this.type = type
+    this.props = props
+    this.parent = parent
+    this.dom = dom
+    this.child = child
+    this.sibling = sibling
   }
 }
 
-const executeWorkUnit = (fiber)=>{
-  console.log(fiber,'---work');
-  //1.创建dom
-  if(!fiber.dom){
-    const dom = fiber.type === TEXT_ELEMENT ? document.createTextNode('') : document.createElement(fiber.type)
-    fiber.dom = dom
-    fiber.parent.dom?.append(dom)
+const linkChild = fiber => {
+  let prevChild = null
+  fiber.props.children.forEach((child, index) => {
+    const newFiber = new Fiber(child.type, child.props, fiber)
+    if (index === 0) {
+      fiber.child = newFiber
+    } else {
+      prevChild.sibling = newFiber
+    }
+    prevChild = newFiber
+  })
+}
 
+const executeWorkUnit = fiber => {
+  if (!fiber.dom) {
+    const dom = (fiber.dom = creatDom(fiber.type))
+    fiber.parent.dom?.append(dom)
     //2.创建props
-    Object.keys(fiber.props).forEach(key => {
-      if (key !== 'children') {
-        dom[key] = fiber.props[key]
-      }
-    })
+    handleProps(dom, fiber.props)
   }
   //3.创建关系，转成链表
-  let prevChild = null
-  fiber.props.children.forEach((child,index)=>{
-    child.parent = fiber
-    if(index === 0){
-      fiber.child = child
-    }else{
-      child.sibling = prevChild
-    }
-    prevChild = child
-  })
+  linkChild(fiber)
   //4.返回下一个要渲染的单元
-  if(fiber.child){
+  if (fiber.child) {
     return fiber.child
   }
 
-  if(fiber.sibling){
+  if (fiber.sibling) {
     return fiber.sibling
   }
 
@@ -77,14 +78,13 @@ const executeWorkUnit = (fiber)=>{
 }
 
 let nextUnitOfWork = null
-const workLoop = (deadLine) => {
+const workLoop = deadLine => {
   let shouldYield = false
-   while(!shouldYield && nextUnitOfWork){
-      //执行任务
-      nextUnitOfWork = executeWorkUnit(nextUnitOfWork)
-
-      shouldYield = deadLine.timeRemaining() < 1
-   }
+  while (!shouldYield && nextUnitOfWork) {
+    //执行任务
+    nextUnitOfWork = executeWorkUnit(nextUnitOfWork)
+    shouldYield = deadLine.timeRemaining() < 1
+  }
   requestIdleCallback(workLoop)
 }
 
