@@ -1,3 +1,4 @@
+import { isTextNode } from './utils'
 const TEXT_ELEMENT = 'TEXT_ELEMENT'
 
 const createElement = (type, props, ...children) => {
@@ -5,7 +6,9 @@ const createElement = (type, props, ...children) => {
     type,
     props: {
       ...props,
-      children: children.map(child => (typeof child === 'string' ? createTextNode(child) : child)),
+      children: children.map(child => {
+        return isTextNode(child) ? createTextNode(child) : child
+      }),
     },
   }
 }
@@ -44,9 +47,9 @@ class Fiber {
   }
 }
 
-const linkChild = fiber => {
+const linkChild = (fiber, children) => {
   let prevChild = null
-  fiber.props.children.forEach((child, index) => {
+  children.forEach((child, index) => {
     const newFiber = new Fiber(child.type, child.props, fiber)
     if (index === 0) {
       fiber.child = newFiber
@@ -57,24 +60,39 @@ const linkChild = fiber => {
   })
 }
 
-const executeWorkUnit = fiber => {
+const updateFunctionComponent = fiber => {
+  const children = [fiber.type(fiber.props)]
+  linkChild(fiber, children)
+}
+const updateHostComponent = fiber => {
   if (!fiber.dom) {
-    const dom = (fiber.dom = creatDom(fiber.type))
-    //2.创建props
-    handleProps(dom, fiber.props)
+    fiber.dom = creatDom(fiber.type)
+    handleProps(fiber.dom, fiber.props)
   }
-  //3.创建关系，转成链表
-  linkChild(fiber)
+  linkChild(fiber, fiber.props.children)
+}
+
+const executeWorkUnit = fiber => {
+  const isFunctionComponent = typeof fiber.type === 'function'
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    updateHostComponent(fiber)
+  }
+
   //4.返回下一个要渲染的单元
   if (fiber.child) {
     return fiber.child
   }
 
-  if (fiber.sibling) {
-    return fiber.sibling
+  //链表的下一个节点，如果没有兄弟节点，就找父节点的兄弟节点，直到找到为止
+  let nextFiber = fiber
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    nextFiber = nextFiber.parent
   }
-
-  return fiber.parent?.sibling
 }
 
 let root = null
@@ -84,7 +102,13 @@ const commitRoot = () => {
 }
 const commitWork = fiber => {
   if (!fiber) return
-  fiber.parent.dom?.append(fiber.dom)
+  let parent = fiber.parent
+  while (!parent.dom) {
+    parent = parent.parent
+  }
+  if (fiber.dom) {
+    parent.dom.append(fiber.dom)
+  }
   commitWork(fiber.child)
   commitWork(fiber.sibling)
 }
