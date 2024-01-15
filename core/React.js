@@ -20,6 +20,7 @@ const createTextNode = textValue => {
 }
 const render = (vdom, container) => {
   nextUnitOfWork = new Fiber(null, { children: [vdom] }, null, container)
+  root = nextUnitOfWork
 }
 const creatDom = type => {
   return type === TEXT_ELEMENT ? document.createTextNode('') : document.createElement(type)
@@ -59,7 +60,6 @@ const linkChild = fiber => {
 const executeWorkUnit = fiber => {
   if (!fiber.dom) {
     const dom = (fiber.dom = creatDom(fiber.type))
-    fiber.parent.dom?.append(dom)
     //2.创建props
     handleProps(dom, fiber.props)
   }
@@ -77,6 +77,18 @@ const executeWorkUnit = fiber => {
   return fiber.parent?.sibling
 }
 
+let root = null
+const commitRoot = () => {
+  commitWork(root.child)
+  root = null
+}
+const commitWork = fiber => {
+  if (!fiber) return
+  fiber.parent.dom?.append(fiber.dom)
+  commitWork(fiber.child)
+  commitWork(fiber.sibling)
+}
+
 let nextUnitOfWork = null
 const workLoop = deadLine => {
   let shouldYield = false
@@ -84,6 +96,9 @@ const workLoop = deadLine => {
     //执行任务
     nextUnitOfWork = executeWorkUnit(nextUnitOfWork)
     shouldYield = deadLine.timeRemaining() < 1
+  }
+  if (!nextUnitOfWork && root) {
+    commitRoot()
   }
   requestIdleCallback(workLoop)
 }
